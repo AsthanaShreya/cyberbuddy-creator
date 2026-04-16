@@ -38,10 +38,11 @@ export default function AuthPage() {
       authSchema.parse({ email, password });
       setErrors({});
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const fieldErrors: { email?: string; password?: string } = {};
-        error.errors.forEach((err) => {
+        const issues = error.issues;
+        issues.forEach((err) => {
           if (err.path[0] === 'email') fieldErrors.email = err.message;
           if (err.path[0] === 'password') fieldErrors.password = err.message;
         });

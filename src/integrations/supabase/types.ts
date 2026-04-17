@@ -14,7 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      incidents: {
+        Row: {
+          confidence: number
+          created_at: string
+          destination: string | null
+          details: string | null
+          id: string
+          input_snippet: string | null
+          ipfs_cid: string | null
+          ipfs_url: string | null
+          label: string
+          module: string
+          source: string | null
+          source_ip: string | null
+          status: string
+          user_agent: string | null
+          user_email: string | null
+          user_local_id: string | null
+        }
+        Insert: {
+          confidence: number
+          created_at?: string
+          destination?: string | null
+          details?: string | null
+          id?: string
+          input_snippet?: string | null
+          ipfs_cid?: string | null
+          ipfs_url?: string | null
+          label: string
+          module: string
+          source?: string | null
+          source_ip?: string | null
+          status?: string
+          user_agent?: string | null
+          user_email?: string | null
+          user_local_id?: string | null
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          destination?: string | null
+          details?: string | null
+          id?: string
+          input_snippet?: string | null
+          ipfs_cid?: string | null
+          ipfs_url?: string | null
+          label?: string
+          module?: string
+          source?: string | null
+          source_ip?: string | null
+          status?: string
+          user_agent?: string | null
+          user_email?: string | null
+          user_local_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

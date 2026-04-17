@@ -1,61 +1,62 @@
-import { Book, Code, Terminal, Settings, FileCode, Zap } from 'lucide-react';
+import { Book, Code, Terminal, FileCode, Zap, Database } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const sections = [
   {
     id: 'overview', title: 'Overview of CyberBuddy', icon: Book,
-    content: `CyberBuddy is an AI-powered cyber threat detection and decentralized incident reporting platform. It combines advanced machine learning models with blockchain technology to provide comprehensive security analysis and immutable incident logging.
+    content: `CyberBuddy is an AI-powered cyber threat detection and decentralized incident reporting platform. It combines a high-precision rule-based detection engine with a Lovable AI fallback for ambiguous cases, and stores every detected incident on IPFS via Pinata for tamper-evident logging.
 
-The platform supports four main threat detection modules:
-• Phishing Detection - Analyzes emails and URLs for phishing attempts
-• DDoS/Intrusion Detection - Monitors network traffic for attack patterns
-• SQL Injection Detection - Scans URLs and requests for injection vulnerabilities
-• Malware Detection - Analyzes files for malicious signatures`,
+The platform supports four threat detection modules:
+• Phishing Detection — emails, URLs, and screenshot uploads
+• DDoS / Intrusion Detection — network traffic patterns
+• SQL Injection Detection — URLs and HTTP request strings
+• Malware Detection — uploaded files (signature + heuristic analysis)`,
   },
   {
     id: 'modules', title: 'Threat Modules Explained', icon: Zap,
-    content: `Each threat detection module uses specialized machine learning models trained on large datasets:
+    content: `Each module runs a deterministic rule engine first, then escalates ambiguous cases to a Gemini-powered classifier:
 
-**Phishing Scanner** - Uses NLP models to analyze email content, URL patterns, and sender information.
-**DDoS/Intrusion Scanner** - Analyzes network traffic patterns, packet distributions, and connection behaviors.
-**SQL Injection Scanner** - Examines URL parameters and HTTP requests for SQL injection patterns.
-**Malware Scanner** - Uses signature-based and behavioral analysis to detect malware.`,
+**Phishing Scanner** — keyword/brand/typosquat detection, suspicious TLDs, IP-only URLs, and visual screenshot intake.
+**DDoS / Intrusion Scanner** — analyzes packet volumes, unique source IPs, SYN floods, amplification, and known botnet signatures.
+**SQL Injection Scanner** — pattern matching for tautologies, UNION SELECT, time-based payloads, comment markers, and encoded variants.
+**Malware Scanner** — file extension + double-extension checks, EICAR signature, and behavioural strings (powershell -enc, mimikatz, etc.).`,
+  },
+  {
+    id: 'ipfs', title: 'IPFS Storage with Pinata', icon: Database,
+    content: `Every detected incident is serialized to JSON and pinned to IPFS, returning a content identifier (CID) that is stored alongside the record in the database.
+
+• CIDs are immutable — any change to the incident produces a new CID, giving you tamper-evidence.
+• Logs can be opened on any public IPFS gateway (e.g. https://ipfs.io/ipfs/<CID>) or your own Pinata gateway.
+• No blockchain, smart contracts, or testnet wallets are required.`,
   },
   {
     id: 'usage', title: 'How to Use the Scanner', icon: Terminal,
-    content: `1. Sign up or log in to your CyberBuddy account
-2. Navigate to Threat Scanner from the navigation menu
-3. Select a module by clicking on the appropriate tab
-4. Enter your data in the provided input fields
-5. Click "Scan" to submit for analysis
-6. Review results showing threat label, confidence score, and details
-7. Optionally log incidents to IPFS and blockchain for verification`,
+    content: `1. Sign up or log in to CyberBuddy
+2. Open Threat Scanner
+3. Pick a module tab (Phishing, DDoS, SQLi, Malware)
+4. Provide input — paste text, enter URLs, upload an image (Phishing) or a file (Malware)
+5. Click Scan — results show the threat label, confidence, and concrete evidence
+6. Open Incident Logs to review every prior detection, complete with source, destination, IP, and IPFS CID`,
   },
   {
-    id: 'api-models', title: 'About AI Models', icon: FileCode,
-    content: `CyberBuddy integrates with ML services for threat detection:
+    id: 'api-models', title: 'About the AI Models', icon: FileCode,
+    content: `CyberBuddy uses a hybrid pipeline:
 
-**Phishing Model** - Based on transformer architecture, trained on phishing email datasets
-**DDoS Model** - Uses Random Forest and Deep Learning ensemble, trained on NSL-KDD/CICIDS
-**SQL Injection Model** - Rule-based + ML hybrid approach trained on web attack datasets
-**Malware Model** - Static and dynamic analysis combined with malware signature databases`,
+**Rule Engine (primary)** — deterministic detectors with weighted scoring, instant and offline.
+**Lovable AI Gemini Fallback** — invoked for borderline cases via a Supabase Edge Function. Returns a strict JSON verdict via tool calling.
+
+This gives high precision on clear-cut threats and high recall on ambiguous, novel inputs.`,
   },
 ];
 
 const apiDocs = {
   endpoints: [
-    { method: 'POST', path: '/api/scan/phishing', description: 'Scan email/URL for phishing',
-      request: `{ "emailBody": "Dear user, your account...", "url": "https://suspicious-link.com" }`,
-      response: `{ "label": "Malicious", "confidence": 0.94, "details": "Detected phishing patterns...", "module": "phishing" }` },
-    { method: 'POST', path: '/api/scan/ddos', description: 'Analyze network traffic for DDoS',
-      request: `{ "trafficData": "192.168.1.1,80,TCP,..." }`,
-      response: `{ "label": "Safe", "confidence": 0.87, "details": "No DDoS indicators", "module": "ddos" }` },
-    { method: 'POST', path: '/api/scan/sqli', description: 'Check URL for SQL injection',
-      request: `{ "url": "https://example.com/page?id=1", "requestString": "GET /page?id=1' OR '1'='1" }`,
-      response: `{ "label": "Suspicious", "confidence": 0.72, "details": "SQL injection attempt detected", "module": "sqli" }` },
-    { method: 'POST', path: '/api/scan/malware', description: 'Scan file for malware',
-      request: `{ "fileName": "suspicious.exe", "fileContent": "base64_encoded_content" }`,
-      response: `{ "label": "Malicious", "confidence": 0.98, "details": "Known malware signature detected", "module": "malware" }` },
+    { method: 'POST', path: '/functions/v1/scan-threat', description: 'Edge function that classifies an input via Gemini',
+      request: `{ "module": "phishing", "input": { "emailBody": "..." } }`,
+      response: `{ "label": "Malicious", "confidence": 0.94, "details": "..." }` },
+    { method: 'POST', path: 'supabase.from("incidents").insert(...)', description: 'Persist a detected incident with IPFS CID',
+      request: `{ module, label, confidence, details, source, destination, source_ip, ipfs_cid }`,
+      response: `{ id, created_at, ... }` },
   ],
 };
 
@@ -64,7 +65,7 @@ export default function DocumentationPage() {
     <div className="container mx-auto px-4 py-12">
       <div className="mb-12">
         <h1 className="text-4xl font-bold mb-4"><span className="text-gradient-primary">Documentation</span></h1>
-        <p className="text-muted-foreground max-w-2xl">Learn how to use CyberBuddy, understand our threat detection modules, and explore the API.</p>
+        <p className="text-muted-foreground max-w-2xl">Learn how to use CyberBuddy, understand the detection modules, and explore the API.</p>
       </div>
 
       <div className="space-y-8 mb-16">
@@ -95,7 +96,7 @@ export default function DocumentationPage() {
       <Card className="cyber-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
-            <Terminal className="h-5 w-5 text-primary" />API Endpoints
+            <Terminal className="h-5 w-5 text-primary" />Endpoints
           </CardTitle>
         </CardHeader>
         <CardContent>

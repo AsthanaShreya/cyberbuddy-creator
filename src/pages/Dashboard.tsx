@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { BarChart3, Shield, Fish, Syringe, Bug, TrendingUp, Clock, Eye, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { LABEL_COLORS, type ThreatLabel } from '@/lib/config';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Scan {
   id: string;
@@ -23,19 +24,9 @@ interface Scan {
 const moduleIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   phishing: Fish, ddos: Shield, sqli: Syringe, malware: Bug,
 };
-
 const moduleLabels: Record<string, string> = {
   phishing: 'Phishing', ddos: 'DDoS', sqli: 'SQL Injection', malware: 'Malware',
 };
-
-// Demo data for display
-const demoScans: Scan[] = [
-  { id: '1', module: 'phishing', label: 'Malicious', confidence: 0.94, details: 'Detected phishing patterns in email content.', created_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: '2', module: 'ddos', label: 'Safe', confidence: 0.87, details: 'No DDoS indicators detected.', created_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: '3', module: 'sqli', label: 'Suspicious', confidence: 0.72, details: 'Potential SQL injection pattern detected.', created_at: new Date(Date.now() - 10800000).toISOString() },
-  { id: '4', module: 'malware', label: 'Malicious', confidence: 0.98, details: 'Known malware signature detected.', created_at: new Date(Date.now() - 14400000).toISOString() },
-  { id: '5', module: 'phishing', label: 'Safe', confidence: 0.91, details: 'No phishing indicators found.', created_at: new Date(Date.now() - 18000000).toISOString() },
-];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
@@ -53,8 +44,21 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [scans] = useState<Scan[]>(demoScans);
+  const [scans, setScans] = useState<Scan[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('incidents')
+        .select('id, module, label, confidence, details, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (data) setScans(data as Scan[]);
+      setLoading(false);
+    })();
+  }, []);
 
   const stats = useMemo(() => {
     const moduleCounts = { phishing: 0, ddos: 0, sqli: 0, malware: 0 };
@@ -65,10 +69,10 @@ export default function DashboardPage() {
   }, [scans]);
 
   const moduleChartData = useMemo(() => [
-    { name: 'Phishing', scans: stats.phishing, color: 'hsl(var(--chart-1))' },
-    { name: 'DDoS', scans: stats.ddos, color: 'hsl(var(--chart-2))' },
-    { name: 'SQL Injection', scans: stats.sqli, color: 'hsl(var(--chart-3))' },
-    { name: 'Malware', scans: stats.malware, color: 'hsl(var(--chart-4))' },
+    { name: 'Phishing', scans: stats.phishing },
+    { name: 'DDoS', scans: stats.ddos },
+    { name: 'SQL Injection', scans: stats.sqli },
+    { name: 'Malware', scans: stats.malware },
   ], [stats]);
 
   const threatSummaryData = useMemo(() => {
@@ -88,7 +92,10 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Welcome back, <span className="text-foreground">{user?.email}</span>. Here's your security overview.</p>
       </div>
 
-      {/* Stats Cards */}
+      {loading ? (
+        <div className="text-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /></div>
+      ) : (
+      <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <Card className="cyber-card col-span-2 lg:col-span-1">
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><BarChart3 className="h-4 w-4" />Total Scans</CardTitle></CardHeader>
@@ -105,7 +112,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Charts */}
       <div className="grid lg:grid-cols-3 gap-8 mb-8">
         <Card className="cyber-card lg:col-span-2">
           <CardHeader><CardTitle className="flex items-center gap-2 text-foreground"><BarChart3 className="h-5 w-5 text-primary" />Scan Distribution</CardTitle></CardHeader>
@@ -133,7 +139,7 @@ export default function DashboardPage() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex justify-center gap-4 mt-4">
+            <div className="flex justify-center gap-4 mt-4 flex-wrap">
               {threatSummaryData.map(item => (
                 <div key={item.name} className="flex items-center gap-2 text-sm">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
@@ -145,7 +151,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Scans */}
       <Card className="cyber-card">
         <CardHeader><CardTitle className="flex items-center gap-2 text-foreground"><Clock className="h-5 w-5 text-primary" />Recent Scans</CardTitle></CardHeader>
         <CardContent>
@@ -161,27 +166,32 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {scans.slice(0, 5).map(scan => {
-                  const labelColors = LABEL_COLORS[scan.label];
+                {scans.slice(0, 10).map(scan => {
+                  const c = LABEL_COLORS[scan.label] || LABEL_COLORS.Suspicious;
                   return (
                     <tr key={scan.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                       <td className="py-3 px-4 text-sm text-foreground">{new Date(scan.created_at).toLocaleString()}</td>
-                      <td className="py-3 px-4 text-sm text-foreground">{moduleLabels[scan.module]}</td>
+                      <td className="py-3 px-4 text-sm text-foreground">{moduleLabels[scan.module] || scan.module}</td>
                       <td className="py-3 px-4">
-                        <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border', labelColors.bg, labelColors.text, labelColors.border)}>{scan.label}</span>
+                        <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border', c.bg, c.text, c.border)}>{scan.label}</span>
                       </td>
-                      <td className="py-3 px-4 text-sm font-mono text-foreground">{(scan.confidence * 100).toFixed(1)}%</td>
+                      <td className="py-3 px-4 text-sm font-mono text-foreground">{(Number(scan.confidence) * 100).toFixed(1)}%</td>
                       <td className="py-3 px-4 text-right">
                         <Button variant="ghost" size="sm" onClick={() => setSelectedScan(scan)}><Eye className="h-4 w-4" /></Button>
                       </td>
                     </tr>
                   );
                 })}
+                {scans.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-8 text-muted-foreground text-sm">No scans yet — head to Threat Scanner to run your first detection.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
+      </>
+      )}
 
       <Dialog open={!!selectedScan} onOpenChange={() => setSelectedScan(null)}>
         <DialogContent className="cyber-card max-w-lg">
@@ -190,8 +200,8 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div><span className="text-sm text-muted-foreground">Module</span><p className="font-medium text-foreground">{moduleLabels[selectedScan.module]}</p></div>
-                <div><span className="text-sm text-muted-foreground">Result</span><p className={cn('font-medium', LABEL_COLORS[selectedScan.label].text)}>{selectedScan.label}</p></div>
-                <div><span className="text-sm text-muted-foreground">Confidence</span><p className="font-mono font-medium text-foreground">{(selectedScan.confidence * 100).toFixed(1)}%</p></div>
+                <div><span className="text-sm text-muted-foreground">Result</span><p className={cn('font-medium', (LABEL_COLORS[selectedScan.label] || LABEL_COLORS.Suspicious).text)}>{selectedScan.label}</p></div>
+                <div><span className="text-sm text-muted-foreground">Confidence</span><p className="font-mono font-medium text-foreground">{(Number(selectedScan.confidence) * 100).toFixed(1)}%</p></div>
                 <div><span className="text-sm text-muted-foreground">Date</span><p className="font-medium text-foreground">{new Date(selectedScan.created_at).toLocaleString()}</p></div>
               </div>
               <div className="p-4 rounded-lg bg-muted/50 border border-border">

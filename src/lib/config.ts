@@ -11,22 +11,26 @@ export interface ThreatScanResult {
   details: string;
   timestamp: string;
   module: ThreatModule;
+  source?: string;
+  destination?: string;
+  sourceIp?: string;
+  userAgent?: string;
+  inputSnippet?: string;
+  ipfsCid?: string;
+  ipfsUrl?: string;
+  incidentId?: string;
   error?: string;
-}
-
-export interface ApiErrorResponse {
-  error: string;
-  code?: string;
 }
 
 export interface PhishingScanRequest {
   emailBody?: string;
   url?: string;
+  imageName?: string;
+  imageDataUrl?: string;
 }
 
 export interface DDoSScanRequest {
   trafficData?: string;
-  logFile?: File;
 }
 
 export interface SQLiScanRequest {
@@ -36,7 +40,8 @@ export interface SQLiScanRequest {
 
 export interface MalwareScanRequest {
   fileName?: string;
-  fileContent?: string;
+  fileSize?: number;
+  fileText?: string;
 }
 
 export const MODULE_CONFIG: Record<ThreatModule, {
@@ -45,50 +50,14 @@ export const MODULE_CONFIG: Record<ThreatModule, {
   endpoint: string;
   icon: string;
 }> = {
-  phishing: {
-    name: 'Phishing Scanner',
-    description: 'Detects phishing attempts in emails and URLs',
-    endpoint: '/scan/phishing',
-    icon: '🎣',
-  },
-  ddos: {
-    name: 'DDoS/Intrusion Scanner',
-    description: 'Analyzes network traffic for DDoS and intrusion patterns',
-    endpoint: '/scan/ddos',
-    icon: '🛡️',
-  },
-  sqli: {
-    name: 'SQL Injection Scanner',
-    description: 'Detects SQL injection vulnerabilities in URLs and requests',
-    endpoint: '/scan/sqli',
-    icon: '💉',
-  },
-  malware: {
-    name: 'Malware Scanner',
-    description: 'Scans files for malware signatures and suspicious patterns',
-    endpoint: '/scan/malware',
-    icon: '🦠',
-  },
+  phishing: { name: 'Phishing Scanner', description: 'Detects phishing attempts in emails, URLs, and screenshots', endpoint: '/scan/phishing', icon: '🎣' },
+  ddos:     { name: 'DDoS/Intrusion Scanner', description: 'Analyzes network traffic for DDoS and intrusion patterns', endpoint: '/scan/ddos', icon: '🛡️' },
+  sqli:     { name: 'SQL Injection Scanner', description: 'Detects SQL injection vulnerabilities in URLs and requests', endpoint: '/scan/sqli', icon: '💉' },
+  malware:  { name: 'Malware Scanner', description: 'Scans uploaded files for malware signatures and suspicious patterns', endpoint: '/scan/malware', icon: '🦠' },
 };
 
-export const LABEL_COLORS: Record<ThreatLabel, {
-  bg: string;
-  text: string;
-  border: string;
-}> = {
-  Safe: {
-    bg: 'bg-cyber-green/10',
-    text: 'text-cyber-green',
-    border: 'border-cyber-green/30',
-  },
-  Suspicious: {
-    bg: 'bg-cyber-amber/10',
-    text: 'text-cyber-amber',
-    border: 'border-cyber-amber/30',
-  },
-  Malicious: {
-    bg: 'bg-cyber-red/10',
-    text: 'text-cyber-red',
-    border: 'border-cyber-red/30',
-  },
+export const LABEL_COLORS: Record<ThreatLabel, { bg: string; text: string; border: string }> = {
+  Safe:       { bg: 'bg-cyber-green/10', text: 'text-cyber-green', border: 'border-cyber-green/30' },
+  Suspicious: { bg: 'bg-cyber-amber/10', text: 'text-cyber-amber', border: 'border-cyber-amber/30' },
+  Malicious:  { bg: 'bg-cyber-red/10',   text: 'text-cyber-red',   border: 'border-cyber-red/30' },
 };

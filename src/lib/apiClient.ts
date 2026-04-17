@@ -1,118 +1,150 @@
 /**
  * CyberBuddy API Client
- * 
- * Handles all API calls. Uses mock/simulated responses for demonstration.
+ *
+ * Hybrid detection:
+ *  1. Rule-based engine (instant, deterministic, high precision)
+ *  2. Lovable AI fallback for ambiguous cases (edge function)
+ *  3. Persists every detection to the `incidents` table
+ *  4. Generates a mock IPFS CID (real Pinata wiring can be added later)
  */
 
-import type { 
-  ThreatScanResult, 
+import { supabase } from '@/integrations/supabase/client';
+import type {
+  ThreatScanResult,
   ThreatModule,
   PhishingScanRequest,
   DDoSScanRequest,
   SQLiScanRequest,
   MalwareScanRequest,
+  ThreatLabel,
 } from './config';
+import { detectByModule, type RuleVerdict } from './detection';
 
-// Simulated scan function (since no real backend is connected)
-async function simulateScan(
+interface PersistContext {
+  module: ThreatModule;
+  verdict: RuleVerdict;
+  inputSnippet: string;
+  source?: string;
+  destination?: string;
+  user?: { id: string; email: string } | null;
+}
+
+function mockCid(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return 'Qm' + Array.from({ length: 44 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+async function getClientIp(): Promise<string | undefined> {
+  try {
+    const r = await fetch('https://api.ipify.org?format=json');
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    return j.ip as string;
+  } catch {
+    return undefined;
+  }
+}
+
+async function aiFallback(module: ThreatModule, input: object): Promise<RuleVerdict | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('scan-threat', { body: { module, input } });
+    if (error || !data || data.error) return null;
+    return {
+      label: data.label as ThreatLabel,
+      confidence: Number(data.confidence),
+      details: String(data.details),
+      ambiguous: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function persistIncident(ctx: PersistContext): Promise<{ cid: string; url: string; id?: string }> {
+  const cid = mockCid();
+  const url = `https://ipfs.io/ipfs/${cid}`;
+  const sourceIp = await getClientIp();
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
+
+  const { data, error } = await supabase
+    .from('incidents')
+    .insert({
+      user_local_id: ctx.user?.id ?? null,
+      user_email: ctx.user?.email ?? null,
+      module: ctx.module,
+      label: ctx.verdict.label,
+      confidence: ctx.verdict.confidence,
+      details: ctx.verdict.details,
+      input_snippet: ctx.inputSnippet.slice(0, 1000),
+      source: ctx.source ?? ctx.verdict.source ?? null,
+      destination: ctx.destination ?? ctx.verdict.destination ?? null,
+      source_ip: sourceIp ?? null,
+      user_agent: userAgent ?? null,
+      ipfs_cid: cid,
+      ipfs_url: url,
+      status: 'Confirmed',
+    })
+    .select('id')
+    .maybeSingle();
+
+  if (error) console.error('persistIncident error', error);
+  return { cid, url, id: data?.id };
+}
+
+async function runScan(
   module: ThreatModule,
-  _payload: object
+  data: PhishingScanRequest | DDoSScanRequest | SQLiScanRequest | MalwareScanRequest,
+  user: { id: string; email: string } | null,
 ): Promise<ThreatScanResult> {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-  
-  const labels: Array<'Safe' | 'Suspicious' | 'Malicious'> = ['Safe', 'Suspicious', 'Malicious'];
-  const label = labels[Math.floor(Math.random() * labels.length)];
-  const confidence = 0.65 + Math.random() * 0.3;
-  
-  const detailsMap: Record<ThreatModule, Record<string, string>> = {
-    phishing: {
-      Safe: 'No phishing indicators detected. The content appears legitimate.',
-      Suspicious: 'Some phishing patterns detected. The email contains suspicious links and urgency cues.',
-      Malicious: 'High confidence phishing detected. Multiple indicators: spoofed sender, malicious URLs, credential harvesting attempt.',
-    },
-    ddos: {
-      Safe: 'Network traffic appears normal. No DDoS patterns detected.',
-      Suspicious: 'Unusual traffic spike detected. Possible volumetric attack in early stages.',
-      Malicious: 'DDoS attack confirmed. High volume of SYN flood packets from multiple sources detected.',
-    },
-    sqli: {
-      Safe: 'No SQL injection vulnerabilities found in the provided input.',
-      Suspicious: 'Potential SQL injection pattern detected. Input contains suspicious characters.',
-      Malicious: 'SQL injection attack detected. Payload contains UNION-based injection with data exfiltration attempt.',
-    },
-    malware: {
-      Safe: 'File scan complete. No malware signatures or suspicious behaviors detected.',
-      Suspicious: 'File contains obfuscated code that may indicate malicious intent.',
-      Malicious: 'Malware detected! File matches known trojan signature with keylogging capabilities.',
-    },
-  };
+  let verdict = detectByModule(module, data);
+
+  if (verdict.ambiguous) {
+    const ai = await aiFallback(module, data);
+    if (ai) verdict = { ...ai, ambiguous: false, source: verdict.source, destination: verdict.destination };
+  }
+
+  const inputSnippet = JSON.stringify(data).slice(0, 1000);
+  const { cid, url, id } = await persistIncident({
+    module,
+    verdict,
+    inputSnippet,
+    source: verdict.source,
+    destination: verdict.destination,
+    user,
+  });
 
   return {
-    label,
-    confidence,
-    details: detailsMap[module][label],
+    label: verdict.label,
+    confidence: verdict.confidence,
+    details: verdict.details,
     timestamp: new Date().toISOString(),
     module,
+    source: verdict.source,
+    destination: verdict.destination,
+    inputSnippet,
+    ipfsCid: cid,
+    ipfsUrl: url,
+    incidentId: id,
   };
-}
-
-export async function scanPhishing(request: PhishingScanRequest): Promise<ThreatScanResult> {
-  return simulateScan('phishing', request);
-}
-
-export async function scanDDoS(request: DDoSScanRequest): Promise<ThreatScanResult> {
-  return simulateScan('ddos', { trafficData: request.trafficData });
-}
-
-export async function scanSQLi(request: SQLiScanRequest): Promise<ThreatScanResult> {
-  return simulateScan('sqli', request);
-}
-
-export async function scanMalware(request: MalwareScanRequest): Promise<ThreatScanResult> {
-  return simulateScan('malware', request);
 }
 
 export async function scanThreat(
   module: ThreatModule,
-  data: PhishingScanRequest | DDoSScanRequest | SQLiScanRequest | MalwareScanRequest
+  data: PhishingScanRequest | DDoSScanRequest | SQLiScanRequest | MalwareScanRequest,
+  user: { id: string; email: string } | null = null,
 ): Promise<ThreatScanResult> {
-  switch (module) {
-    case 'phishing': return scanPhishing(data as PhishingScanRequest);
-    case 'ddos': return scanDDoS(data as DDoSScanRequest);
-    case 'sqli': return scanSQLi(data as SQLiScanRequest);
-    case 'malware': return scanMalware(data as MalwareScanRequest);
-    default: throw new Error(`Unknown module: ${module}`);
-  }
+  return runScan(module, data, user);
 }
 
-export interface IncidentLogRequest {
-  scanResult: ThreatScanResult;
-  userId: string;
-}
+// Legacy named exports retained for any external imports
+export const scanPhishing = (r: PhishingScanRequest) => scanThreat('phishing', r);
+export const scanDDoS     = (r: DDoSScanRequest)     => scanThreat('ddos', r);
+export const scanSQLi     = (r: SQLiScanRequest)     => scanThreat('sqli', r);
+export const scanMalware  = (r: MalwareScanRequest)  => scanThreat('malware', r);
 
-export interface IncidentLogResponse {
-  success: boolean;
-  ipfsCid?: string;
-  blockchainTxHash?: string;
-  message: string;
-}
-
-export async function logIncidentToBlockchain(
-  request: IncidentLogRequest
-): Promise<IncidentLogResponse> {
-  console.log('Logging incident to IPFS & Blockchain:', request);
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  return {
-    success: true,
-    ipfsCid: `Qm${generateMockHash(44)}`,
-    blockchainTxHash: `0x${generateMockHash(64)}`,
-    message: 'Incident logged successfully (placeholder - wire actual logic later)',
-  };
-}
-
-function generateMockHash(length: number): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+// Kept for compatibility; unused in new IncidentLogs UI.
+export interface IncidentLogRequest { scanResult: ThreatScanResult; userId: string; }
+export interface IncidentLogResponse { success: boolean; ipfsCid?: string; message: string; }
+export async function logIncidentToBlockchain(_r: IncidentLogRequest): Promise<IncidentLogResponse> {
+  return { success: true, ipfsCid: mockCid(), message: 'Logged to IPFS (mock).' };
 }

@@ -87,7 +87,42 @@ export function detectPhishing(req: PhishingScanRequest): RuleVerdict {
   };
 }
 
+import { DDOS_DEFAULTS, parseDDoSCsv, predictDDoS, type DDoSFeatures } from './ddosFeatures';
+
 export function detectDDoS(req: DDoSScanRequest): RuleVerdict {
+  // Preferred path: structured feature vector (CSV or manual form).
+  let features: DDoSFeatures | null = null;
+
+  if (req.csv) {
+    try {
+      const parsed = parseDDoSCsv(req.csv);
+      features = parsed.features;
+      console.log('[detectDDoS] CSV parsed, rows=', parsed.rowCount, 'missing=', parsed.missing);
+    } catch (e) {
+      console.warn('[detectDDoS] CSV parse failed', e);
+    }
+  }
+  if (!features && req.features) {
+    features = { ...DDOS_DEFAULTS, ...req.features } as DDoSFeatures;
+  }
+
+  if (features) {
+    const p = predictDDoS(features);
+    const label: ThreatLabel = p.label;
+    const details =
+      `${p.attack_type} — p(attack)=${(p.confidence * 100).toFixed(1)}%. ` +
+      `Indicators: ${p.reasons.join('; ')}.`;
+    return {
+      label,
+      confidence: Math.max(p.confidence, 1 - p.confidence), // display confidence in chosen class
+      details,
+      ambiguous: false,
+      source: `proto=${features.protocol_type} src_bytes=${features.src_bytes}`,
+      destination: `dst_host_count=${features.dst_host_count}`,
+    };
+  }
+
+  // Legacy free-text fallback (kept so old saved scans / pasted logs still work).
   const data = req.trafficData || '';
   const lines = data.split(/\n+/).filter(Boolean);
   const ips = data.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g) || [];
@@ -112,7 +147,7 @@ export function detectDDoS(req: DDoSScanRequest): RuleVerdict {
     ? 'Network traffic baseline is normal. No DDoS indicators.'
     : `DDoS indicators (score ${score}): ${reasons.join('; ')}.`;
 
-  console.log('[detectDDoS]', { lines: lines.length, uniqueIps, synFloods, score, reasons, label });
+  console.log('[detectDDoS:legacy]', { lines: lines.length, uniqueIps, synFloods, score, reasons, label });
 
   const firstIp = ips[0];
   return {

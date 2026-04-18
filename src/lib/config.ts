@@ -30,7 +30,16 @@ export interface PhishingScanRequest {
 }
 
 export interface DDoSScanRequest {
+  /** Legacy free-text traffic blob (kept for backward compatibility). */
   trafficData?: string;
+  /** Structured CICIDS/NSL-KDD style feature vector (preferred). */
+  features?: Partial<Record<
+    | 'duration' | 'protocol_type' | 'src_bytes' | 'dst_bytes'
+    | 'count' | 'srv_count' | 'same_srv_rate'
+    | 'dst_host_count' | 'dst_host_srv_count'
+    | 'dst_host_same_srv_rate' | 'dst_host_diff_srv_rate', number>>;
+  /** Optional CSV upload contents; first matching flow row is scored. */
+  csv?: string;
 }
 
 export interface SQLiScanRequest {

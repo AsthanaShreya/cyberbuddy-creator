@@ -10,6 +10,8 @@ import { scanThreat } from '@/lib/apiClient';
 import { MODULE_CONFIG, LABEL_COLORS, type ThreatScanResult, type ThreatLabel, type ThreatModule } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import DDoSScanForm from '@/components/DDoSScanForm';
+import type { DDoSFeatures } from '@/lib/ddosFeatures';
 
 interface ScanResultCardProps {
   result: ThreatScanResult | null;
@@ -116,7 +118,6 @@ export default function ThreatScannerPage() {
   const [phishingImage, setPhishingImage] = useState<File | null>(null);
   const [phishingImagePreview, setPhishingImagePreview] = useState<string | null>(null);
 
-  const [ddosTraffic, setDdosTraffic] = useState('');
   const [sqliUrl, setSqliUrl] = useState('');
   const [sqliRequest, setSqliRequest] = useState('');
 
@@ -234,15 +235,10 @@ export default function ThreatScannerPage() {
                 <Shield className="h-5 w-5 text-primary" />{MODULE_CONFIG.ddos.name}
               </h3>
               <p className="text-muted-foreground mb-6">{MODULE_CONFIG.ddos.description}</p>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="ddos-traffic">Network Traffic Data</Label>
-                  <Textarea id="ddos-traffic" placeholder="Paste network traffic logs or statistics..." value={ddosTraffic} onChange={(e) => setDdosTraffic(e.target.value)} rows={6} className="mt-2 font-mono text-sm" />
-                </div>
-                <Button onClick={() => runScan('ddos', { trafficData: ddosTraffic })} disabled={loading || !ddosTraffic} className="w-full sm:w-auto glow-cyan">
-                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Scan for DDoS
-                </Button>
-              </div>
+              <DDoSScanForm
+                loading={loading}
+                onScan={(payload) => runScan('ddos', payload)}
+              />
             </div>
           </TabsContent>
 

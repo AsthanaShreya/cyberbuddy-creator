@@ -10,6 +10,8 @@ import { scanThreat } from '@/lib/apiClient';
 import { MODULE_CONFIG, LABEL_COLORS, type ThreatScanResult, type ThreatLabel, type ThreatModule } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import DDoSScanForm from '@/components/DDoSScanForm';
+import type { DDoSFeatures } from '@/lib/ddosFeatures';
 
 interface ScanResultCardProps {
   result: ThreatScanResult | null;

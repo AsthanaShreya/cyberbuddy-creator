@@ -118,7 +118,6 @@ export default function ThreatScannerPage() {
   const [phishingImage, setPhishingImage] = useState<File | null>(null);
   const [phishingImagePreview, setPhishingImagePreview] = useState<string | null>(null);
 
-  const [ddosTraffic, setDdosTraffic] = useState('');
   const [sqliUrl, setSqliUrl] = useState('');
   const [sqliRequest, setSqliRequest] = useState('');
 

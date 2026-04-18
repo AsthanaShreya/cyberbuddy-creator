@@ -16,6 +16,13 @@ serve(async (req) => {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    // A Pinata JWT must have 3 dot-separated segments (header.payload.signature).
+    if (PINATA_JWT.split(".").length !== 3) {
+      console.error("PINATA_JWT is not a valid JWT (expected 3 segments). Length:", PINATA_JWT.length);
+      return new Response(JSON.stringify({
+        error: "PINATA_JWT is malformed. Paste the full JWT from Pinata → API Keys (the long eyJ... string with two dots), not the API Key or API Secret.",
+      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const { incident, name } = await req.json();
     if (!incident) {

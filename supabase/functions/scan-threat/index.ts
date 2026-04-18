@@ -14,13 +14,45 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const systemPrompt = `You are an expert cybersecurity threat detection AI. Analyze the input and classify the threat.
-Module: ${module}
-Return a strict JSON object via the classify_threat tool with fields:
-- label: "Safe" | "Suspicious" | "Malicious"
-- confidence: number between 0.5 and 0.99
-- details: a 2-3 sentence concrete explanation citing evidence from the input
-Be precise, evidence-based, and conservative. If clearly benign, mark Safe.`;
+    const systemPrompt = `You are a cybersecurity threat detection model used in an AI-powered cyber threat detection system.
+Module under analysis: ${module}
+
+Your task is to classify the input into ONE of: MALICIOUS, SUSPICIOUS, SAFE.
+
+STRICT CLASSIFICATION RULES
+- You MUST NOT default to SAFE.
+- You MUST actively search for threat indicators.
+- Act like a real intrusion detection system. Do NOT be lenient.
+
+CLASS DEFINITIONS
+MALICIOUS — clearly harmful or attack-related:
+  • Phishing links (fake login pages, brand impersonation, suspicious TLDs like .xyz/.top/.click)
+  • SQL injection patterns (' OR 1=1, DROP TABLE, UNION SELECT, sleep(), xp_cmdshell, information_schema)
+  • XSS scripts (<script>, onerror=, javascript:)
+  • Malware indicators (.exe/.scr/.bat/.ps1, EICAR, mimikatz, powershell -enc, CreateRemoteThread)
+  • DDoS / botnet patterns (SYN flood, amplification, Mirai)
+  • Known attack payloads
+SUSPICIOUS — unclear but potentially risky:
+  • Shortened URLs (bit.ly, tinyurl, t.co)
+  • Unusual / random-looking domains, IP-address URLs, very long hostnames
+  • Mixed legitimate + suspicious patterns
+  • Encoded or obfuscated content (base64, URL-encoded payloads)
+  • Missing context but looks abnormal
+SAFE — clearly normal and harmless:
+  • Trusted domains (google.com, github.com, microsoft.com)
+  • Plain normal text or legitimate-looking documents (.pdf, .docx) without suspicious content
+  • Clean network traffic baselines
+
+DECISION LOGIC
+1. ANY strong attack pattern → MALICIOUS
+2. Uncertain but risky → SUSPICIOUS
+3. Only clearly normal → SAFE
+Bias toward caution: if unsure → SUSPICIOUS, never SAFE.
+
+Return your classification via the classify_threat tool.
+- label: "Malicious" | "Suspicious" | "Safe"  (capitalized form)
+- confidence: number between 0.50 and 0.99 (your confidence; map a 0-100 score to 0.50-0.99)
+- details: 2-3 sentence concrete technical explanation citing evidence from the input`;
 
     const body = {
       model: "google/gemini-2.5-flash",

@@ -134,7 +134,7 @@ export default function IncidentLogsPage() {
       </Card>
 
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="cyber-card max-w-2xl">
+        <DialogContent className="cyber-card max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="text-foreground">Incident Details</DialogTitle></DialogHeader>
           {selected && (
             <div className="space-y-4">

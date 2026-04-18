@@ -34,6 +34,20 @@ function mockCid(): string {
   return 'Qm' + Array.from({ length: 44 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+async function pinToPinata(incident: object, name: string): Promise<{ cid: string; url: string } | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('pin-incident', { body: { incident, name } });
+    if (error || !data || data.error) {
+      console.warn('Pinata pin failed, falling back to mock CID:', error || data?.error);
+      return null;
+    }
+    return { cid: data.cid, url: data.url };
+  } catch (e) {
+    console.warn('Pinata invoke threw, falling back to mock CID:', e);
+    return null;
+  }
+}
+
 async function getClientIp(): Promise<string | undefined> {
   try {
     const r = await fetch('https://api.ipify.org?format=json');
@@ -61,10 +75,27 @@ async function aiFallback(module: ThreatModule, input: object): Promise<RuleVerd
 }
 
 async function persistIncident(ctx: PersistContext): Promise<{ cid: string; url: string; id?: string }> {
-  const cid = mockCid();
-  const url = `https://ipfs.io/ipfs/${cid}`;
   const sourceIp = await getClientIp();
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
+
+  // Build the immutable incident document and pin it to IPFS via Pinata.
+  const incidentDoc = {
+    module: ctx.module,
+    label: ctx.verdict.label,
+    confidence: ctx.verdict.confidence,
+    details: ctx.verdict.details,
+    source: ctx.source ?? ctx.verdict.source ?? null,
+    destination: ctx.destination ?? ctx.verdict.destination ?? null,
+    source_ip: sourceIp ?? null,
+    user_agent: userAgent ?? null,
+    user_email: ctx.user?.email ?? null,
+    input_snippet: ctx.inputSnippet.slice(0, 1000),
+    timestamp: new Date().toISOString(),
+  };
+
+  const pinned = await pinToPinata(incidentDoc, `cyberbuddy-${ctx.module}-${Date.now()}.json`);
+  const cid = pinned?.cid ?? mockCid();
+  const url = pinned?.url ?? `https://ipfs.io/ipfs/${cid}`;
 
   const { data, error } = await supabase
     .from('incidents')

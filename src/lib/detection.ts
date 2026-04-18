@@ -70,16 +70,18 @@ export function detectPhishing(req: PhishingScanRequest): RuleVerdict {
 
   let label: ThreatLabel = 'Safe';
   let confidence = 0.92;
-  if (score >= 6) { label = 'Malicious'; confidence = Math.min(0.97, 0.8 + score * 0.02); }
-  else if (score >= 2) { label = 'Suspicious'; confidence = 0.75 + Math.min(0.15, score * 0.03); }
+  if (score >= 4) { label = 'Malicious'; confidence = Math.min(0.97, 0.78 + score * 0.025); }
+  else if (score >= 1) { label = 'Suspicious'; confidence = 0.7 + Math.min(0.2, score * 0.06); }
 
   const details = score === 0
     ? 'No phishing indicators detected. Content/URL appear legitimate.'
     : `Detected ${score} risk indicator(s): ${reasons.join('; ')}.`;
 
+  console.log('[detectPhishing]', { score, reasons, label, confidence });
+
   return {
     label, confidence, details,
-    ambiguous: score >= 2 && score < 6 && !!req.emailBody,
+    ambiguous: score >= 1 && score < 4 && !!req.emailBody,
     source: 'user@cyberbuddy.local',
     destination: req.url || (req.emailBody ? 'inbox' : 'screenshot'),
   };
@@ -103,17 +105,19 @@ export function detectDDoS(req: DDoSScanRequest): RuleVerdict {
 
   let label: ThreatLabel = 'Safe';
   let confidence = 0.9;
-  if (score >= 7) { label = 'Malicious'; confidence = Math.min(0.98, 0.82 + score * 0.015); }
-  else if (score >= 3) { label = 'Suspicious'; confidence = 0.78; }
+  if (score >= 5) { label = 'Malicious'; confidence = Math.min(0.98, 0.8 + score * 0.02); }
+  else if (score >= 2) { label = 'Suspicious'; confidence = 0.75 + Math.min(0.18, score * 0.05); }
 
   const details = score === 0
     ? 'Network traffic baseline is normal. No DDoS indicators.'
     : `DDoS indicators (score ${score}): ${reasons.join('; ')}.`;
 
+  console.log('[detectDDoS]', { lines: lines.length, uniqueIps, synFloods, score, reasons, label });
+
   const firstIp = ips[0];
   return {
     label, confidence, details,
-    ambiguous: score >= 3 && score < 7,
+    ambiguous: score >= 2 && score < 5,
     source: firstIp || 'multiple sources',
     destination: 'protected endpoint',
   };
@@ -143,12 +147,14 @@ export function detectSQLi(req: SQLiScanRequest): RuleVerdict {
 
   let label: ThreatLabel = 'Safe';
   let confidence = 0.93;
-  if (score >= 6) { label = 'Malicious'; confidence = Math.min(0.99, 0.85 + score * 0.015); }
-  else if (score >= 2) { label = 'Suspicious'; confidence = 0.76 + Math.min(0.12, score * 0.03); }
+  if (score >= 5) { label = 'Malicious'; confidence = Math.min(0.99, 0.85 + score * 0.015); }
+  else if (score >= 1) { label = 'Suspicious'; confidence = 0.74 + Math.min(0.18, score * 0.05); }
 
   const details = score === 0
     ? 'No SQL injection patterns detected in the input.'
     : `SQLi patterns (score ${score}): ${reasons.join(', ')}.`;
+
+  console.log('[detectSQLi]', { score, reasons, label, confidence, decoded: decoded.slice(0, 200) });
 
   const dest = (() => { try { return new URL(req.url || '').host; } catch { return req.url || 'unknown'; } })();
 
@@ -179,16 +185,18 @@ export function detectMalware(req: MalwareScanRequest): RuleVerdict {
 
   let label: ThreatLabel = 'Safe';
   let confidence = 0.94;
-  if (score >= 6) { label = 'Malicious'; confidence = Math.min(0.99, 0.86 + score * 0.012); }
-  else if (score >= 2) { label = 'Suspicious'; confidence = 0.78; }
+  if (score >= 4) { label = 'Malicious'; confidence = Math.min(0.99, 0.84 + score * 0.018); }
+  else if (score >= 1) { label = 'Suspicious'; confidence = 0.72 + Math.min(0.2, score * 0.06); }
 
   const details = score === 0
     ? 'No malware signatures or suspicious behaviors detected.'
     : `Malware indicators (score ${score}): ${reasons.join('; ')}.`;
 
+  console.log('[detectMalware]', { name, size: req.fileSize, score, reasons, label });
+
   return {
     label, confidence, details,
-    ambiguous: score >= 2 && score < 6,
+    ambiguous: score >= 1 && score < 4,
     source: 'uploaded file',
     destination: req.fileName || 'unknown',
   };

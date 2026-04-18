@@ -235,15 +235,10 @@ export default function ThreatScannerPage() {
                 <Shield className="h-5 w-5 text-primary" />{MODULE_CONFIG.ddos.name}
               </h3>
               <p className="text-muted-foreground mb-6">{MODULE_CONFIG.ddos.description}</p>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="ddos-traffic">Network Traffic Data</Label>
-                  <Textarea id="ddos-traffic" placeholder="Paste network traffic logs or statistics..." value={ddosTraffic} onChange={(e) => setDdosTraffic(e.target.value)} rows={6} className="mt-2 font-mono text-sm" />
-                </div>
-                <Button onClick={() => runScan('ddos', { trafficData: ddosTraffic })} disabled={loading || !ddosTraffic} className="w-full sm:w-auto glow-cyan">
-                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Scan for DDoS
-                </Button>
-              </div>
+              <DDoSScanForm
+                loading={loading}
+                onScan={(payload) => runScan('ddos', payload)}
+              />
             </div>
           </TabsContent>
 

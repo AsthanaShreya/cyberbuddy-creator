@@ -134,10 +134,12 @@ export default function IncidentLogsPage() {
       </Card>
 
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="cyber-card max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="text-foreground">Incident Details</DialogTitle></DialogHeader>
+        <DialogContent className="cyber-card !fixed !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2 max-w-2xl w-[calc(100%-2rem)] max-h-[85vh] p-0 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
+            <DialogTitle className="text-foreground">Incident Details</DialogTitle>
+          </DialogHeader>
           {selected && (
-            <div className="space-y-4">
+            <div className="space-y-4 px-6 pb-6 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <DetailRow icon={Server} label="Module" value={moduleLabels[selected.module] || selected.module} />
                 <DetailRow icon={AlertTriangle} label="Threat" value={selected.label} valueClass={getLabelColors(selected.label).text} />
